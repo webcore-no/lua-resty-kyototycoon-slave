@@ -15,7 +15,8 @@ local BMREPLICATION = char(0xb1)
 local BMNOP = char(0xb0)
 
 local function b2i(bytes, num_bytes, offset)
-	offset, number = offset or 0, 0
+	offset = offset or 0
+	local number = 0
 
 	for b=1, num_bytes do
 		number = number + byte(bytes, offset + num_bytes - b + 1)*2^((b-1)*8)
