@@ -11,6 +11,8 @@ local sub = string.sub
 local band = bit.band
 local lshift = bit.lshift
 
+local worker_exiting = ngx.worker_exiting
+
 local BMREPLICATION = char(0xb1)
 local BMNOP = char(0xb0)
 
@@ -165,7 +167,7 @@ function _M:replicate(callback, ts)
 			end
 		end
 
-		while true do
+		while not worker_exiting() do
 			local magic, err = sock:receive(1)
 			if not magic then
 				return nil, err
