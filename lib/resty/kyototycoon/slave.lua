@@ -215,6 +215,9 @@ function _M:replicate(callback, ts)
 			local cmd = {}
 			callback(parser(data, size, cmd))
 		end
+		
+		-- worker is exiting
+		return ngx.exit(ngx.OK)
 	end
 
 	while true do
