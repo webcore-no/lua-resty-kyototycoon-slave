@@ -1,4 +1,4 @@
-local _M = { _VERSION = 0.1 }
+local _M = {_VERSION = 0.1}
 
 local tcp = ngx.socket.tcp
 local rawget = rawget
@@ -20,8 +20,8 @@ local function b2i(bytes, num_bytes, offset)
 	offset = offset or 0
 	local number = 0
 
-	for b=1, num_bytes do
-		number = number + byte(bytes, offset + num_bytes - b + 1)*2^((b-1)*8)
+	for b = 1, num_bytes do
+		number = number + byte(bytes, offset + num_bytes - b + 1) * 2 ^ ((b - 1) * 8)
 	end
 
 	return number, offset + num_bytes
@@ -30,10 +30,10 @@ end
 local function i2b(number, num_bytes)
 	local result = {}
 
-	for k=num_bytes, 1, -1 do
-		local b, mul = k % num_bytes + 1, 2^(8*(k-1))
-		result[b] = floor(number/mul)
-		number = number - result[b]*mul
+	for k = num_bytes, 1, -1 do
+		local b, mul = k % num_bytes + 1, 2 ^ (8 * (k - 1))
+		result[b] = floor(number / mul)
+		number = number - result[b] * mul
 	end
 
 	return char(unpack(result))
@@ -70,7 +70,7 @@ local OP = {
 		cmd.ttl = b2i(data, 5, 5 + kpos + vpos + ksize)
 		cmd.val = sub(data, 5 + kpos + vpos + 1 + ksize + 1 + 4)
 
-		if cmd.ttl == 2^(5*8) - 1 then
+		if cmd.ttl == 2 ^ (5 * 8) - 1 then
 			cmd.ttl = nil
 		end
 
@@ -99,7 +99,7 @@ local OP = {
 		cmd.op = "clear"
 
 		return cmd
-	end
+	end,
 }
 
 function _M.new(id, ...)
@@ -108,16 +108,14 @@ function _M.new(id, ...)
 		return nil, err
 	end
 
-	return setmetatable(
-		{ _sock = sock, _id = id, _connect = {...}}, { __index = _M }
-	)
+	return setmetatable({_sock = sock, _id = id, _connect = {...}}, {__index = _M})
 end
 
 function _M:replicate(callback, ts)
 	local sock = rawget(self, "_sock")
 
 	if not sock then
-	   return nil, "socket not initialized"
+		return nil, "socket not initialized"
 	end
 
 	if not callback then
@@ -130,7 +128,7 @@ function _M:replicate(callback, ts)
 		BMREPLICATION,
 		i2b(0, 4),
 		nil,
-		i2b(rawget(self, "_id"),2)
+		i2b(rawget(self, "_id"), 2),
 	}
 
 	local function connect()
@@ -237,3 +235,4 @@ function _M:replicate(callback, ts)
 end
 
 return _M
+
