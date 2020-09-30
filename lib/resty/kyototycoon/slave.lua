@@ -21,7 +21,8 @@ local function b2i(bytes, num_bytes, offset)
 	local number = 0
 
 	for b = 1, num_bytes do
-		number = number + byte(bytes, offset + num_bytes - b + 1) * 2 ^ ((b - 1) * 8)
+		number = number + byte(bytes, offset + num_bytes - b + 1)
+			* 2 ^ ((b - 1) * 8)
 	end
 
 	return number, offset + num_bytes
@@ -108,7 +109,8 @@ function _M.new(id, ...)
 		return nil, err
 	end
 
-	return setmetatable({_sock = sock, _id = id, _connect = {...}}, {__index = _M})
+	return setmetatable({_sock = sock, _id = id, _connect = {...}},
+		{__index = _M})
 end
 
 function _M:replicate(callback, ts)
@@ -132,7 +134,8 @@ function _M:replicate(callback, ts)
 	}
 
 	local function connect()
-		local ok, err = sock:connect(table.unpack(rawget(self, "_connect")))
+		local ok, err = sock:connect(table.unpack(
+			rawget(self, "_connect")))
 		if not ok then
 			return nil, err
 		end
@@ -197,12 +200,14 @@ function _M:replicate(callback, ts)
 			end
 
 			if size > 4 then
-				local sidp, dbidp, op = b2i(data, 2), b2i(data, 2, 2), byte(data, 5)
+				local sidp, dbidp, op = b2i(data, 2),
+					b2i(data, 2, 2), byte(data, 5)
 
 				local parser = OP[op]
 
 				if not parser then
-					return nil, format("unknown operation: 0x%.2x", op)
+					return nil,
+					format("unknown operation: 0x%.2x", op)
 				end
 
 				self._ts = ts
