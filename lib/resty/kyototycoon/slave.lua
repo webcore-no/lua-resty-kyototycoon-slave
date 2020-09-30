@@ -203,7 +203,7 @@ function _M:replicate(callback, ts)
 			end
 
 			local sidp, dbidp, op = b2i(data, 2), b2i(data, 2, 2), byte(data, 5)
-			
+
 			local parser = OP[op]
 
 			if not parser then
@@ -215,7 +215,7 @@ function _M:replicate(callback, ts)
 			local cmd = {}
 			callback(parser(data, size, cmd))
 		end
-		
+
 		-- worker is exiting
 		return ngx.exit(ngx.OK)
 	end
