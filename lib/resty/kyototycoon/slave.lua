@@ -11,7 +11,7 @@ local sub = string.sub
 local band = bit.band
 local lshift = bit.lshift
 
-local worker_exiting = ngx.worker_exiting
+local worker_exiting = ngx.worker.exiting
 
 local BMREPLICATION = char(0xb1)
 local BMNOP = char(0xb0)
