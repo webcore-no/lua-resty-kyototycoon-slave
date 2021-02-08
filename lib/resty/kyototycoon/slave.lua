@@ -198,24 +198,24 @@ function _M:replicate(callback, ts)
 				return nil, err
 			end
 
-			if size < 5 then
+			if size > 4 then
+				local sidp, dbidp, op = b2i(data, 2), b2i(data, 2, 2), byte(data, 5)
+
+				local parser = OP[op]
+
+				if not parser then
+					return nil, format("unknown operation: 0x%.2x", op)
+				end
+
+				self._ts = ts
+
+				local cmd = {}
+				callback(parser(data, size, cmd))
+			elseif size < 4 then
 				return nil, "invalid update log"
 			end
-
-			local sidp, dbidp, op = b2i(data, 2), b2i(data, 2, 2), byte(data, 5)
-			
-			local parser = OP[op]
-
-			if not parser then
-				return nil, format("unknown operation: 0x%.2x", op)
-			end
-
-			self._ts = ts
-
-			local cmd = {}
-			callback(parser(data, size, cmd))
 		end
-		
+
 		-- worker is exiting
 		return ngx.exit(ngx.OK)
 	end
