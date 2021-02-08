@@ -1,4 +1,4 @@
-local _M = { _VERSION = 0.1 }
+local _M, OP = { _VERSION = 0.2 }, {}
 
 local tcp = ngx.socket.tcp
 local rawget = rawget
@@ -11,10 +11,12 @@ local sub = string.sub
 local band = bit.band
 local lshift = bit.lshift
 
-local worker_exiting = ngx.worker_exiting
+local worker_exiting = ngx.worker_exiting or function() return false end
 
 local BMREPLICATION = char(0xb1)
 local BMNOP = char(0xb0)
+
+local SET, REMOVE, CLEAR = 0xa1, 0xa2, 0xa5
 
 local function b2i(bytes, num_bytes, offset)
 	offset = offset or 0
@@ -27,16 +29,17 @@ local function b2i(bytes, num_bytes, offset)
 	return number, offset + num_bytes
 end
 
-local function i2b(number, num_bytes)
-	local result = {}
+local i2b do
+	local result, b, m = {}
+	i2b = function(number, num_bytes)
+		for k=num_bytes, 1, -1 do
+			b, m = k % num_bytes + 1, 2^(8*(k-1))
+			result[b] = floor(number/m)
+			number = number - result[b]*m
+		end
 
-	for k=num_bytes, 1, -1 do
-		local b, mul = k % num_bytes + 1, 2^(8*(k-1))
-		result[b] = floor(number/mul)
-		number = number - result[b]*mul
+		return char(unpack(result, 1, num_bytes))
 	end
-
-	return char(unpack(result))
 end
 
 local function readvarnum(data, start)
@@ -52,8 +55,9 @@ local function readvarnum(data, start)
 	return num, pos
 end
 
-local OP = {
-	[0xa1] = function(data, size, cmd)
+do
+	local cmd_t = { op = "set" }
+	OP[SET] = function(data, size)
 		if size < 7 then
 			return nil, "invalid SET message size"
 		end
@@ -65,42 +69,46 @@ local OP = {
 			return nil, "invalid SET message"
 		end
 
-		cmd.op = "set"
-		cmd.key = sub(data, 5 + kpos + vpos + 1, 5 + kpos + vpos + ksize)
-		cmd.ttl = b2i(data, 5, 5 + kpos + vpos + ksize)
-		cmd.val = sub(data, 5 + kpos + vpos + 1 + ksize + 1 + 4)
+		cmd_t.key = sub(data, 5 + kpos + vpos + 1, 5 + kpos + vpos + ksize)
+		cmd_t.ttl = b2i(data, 5, 5 + kpos + vpos + ksize)
+		cmd_t.val = sub(data, 5 + kpos + vpos + 1 + ksize + 1 + 4)
 
-		if cmd.ttl == 2^(5*8) - 1 then
-			cmd.ttl = nil
+		if cmd_t.ttl == 2^(5*8) - 1 then
+			cmd_t.ttl = nil
 		end
 
-		return cmd
-	end,
-	[0xa2] = function(data, size, cmd)
+		return cmd_t
+	end
+end
+
+do
+	local cmd_t, ksiz, kpos = { op = "remove" }
+	OP[REMOVE] = function(data, size)
 		if size < 6 then
 			return nil, "invalid REMOVE message size"
 		end
 
-		local ksize, kpos = readvarnum(data, 6)
-		if 5 + kpos + ksize ~= size then
+		ksiz, kpos = readvarnum(data, 6)
+		if 5 + kpos + ksiz ~= size then
 			return nil, "invalid REMOVE message"
 		end
 
-		cmd.op = "remove"
-		cmd.key = sub(data, 5 + kpos + 1)
+		cmd_t.key = sub(data, 5 + kpos + 1)
 
-		return cmd
-	end,
-	[0xa5] = function(data, size, cmd)
+		return cmd_t
+	end
+end
+
+do
+	local cmd_t = { op = "clear" }
+	OP[CLEAR] = function(_, size)
 		if size ~= 5 then
 			return nil, "invalid CLEAR message size"
 		end
 
-		cmd.op = "clear"
-
-		return cmd
+		return cmd_t
 	end
-}
+end
 
 function _M.new(id, ...)
 	local sock, err = tcp()
@@ -130,11 +138,11 @@ function _M:replicate(callback, ts)
 		BMREPLICATION,
 		i2b(0, 4),
 		nil,
-		i2b(rawget(self, "_id"),2)
+		i2b(rawget(self, "_id"), 2)
 	}
 
 	local function connect()
-		local ok, err = sock:connect(table.unpack(rawget(self, "_connect")))
+		local ok, err = sock:connect(unpack(rawget(self, "_connect")))
 		if not ok then
 			return nil, err
 		end
@@ -167,14 +175,16 @@ function _M:replicate(callback, ts)
 			end
 		end
 
+		local magic, data, size, op, cmd_arg, ok, err
 		while not worker_exiting() do
-			local magic, err = sock:receive(1)
+			magic, err = sock:receive(1)
+
 			if not magic then
 				return nil, err
 			end
 
 			if magic == BMNOP then
-				local ok, err = sock:receive(8)
+				ok, err = sock:receive(8)
 				if not ok then
 					return nil, err
 				end
@@ -186,31 +196,32 @@ function _M:replicate(callback, ts)
 				return nil, "invalid magic from server"
 			end
 
-			local data, err = sock:receive(12)
+			data, err = sock:receive(12)
 			if not data then
 				return nil, err
 			end
 
-			local ts, size = b2i(data, 8), b2i(data, 4, 8)
+			ts, size = b2i(data, 8), b2i(data, 4, 8)
 
-			local data, err = sock:receive(size)
+			data, err = sock:receive(size)
 			if not data then
 				return nil, err
 			end
 
 			if size > 4 then
-				local sidp, dbidp, op = b2i(data, 2), b2i(data, 2, 2), byte(data, 5)
+				-- sidp, dbidp = b2i(data, 2), b2i(data, 2, 2)
+				op = OP[byte(data, 5)]
 
-				local parser = OP[op]
+				if op then
+					cmd_arg, err = op(data, size)
+					if not cmd_arg or not callback(cmd_arg) then
+						return nil, err or "callback failed"
+					end
 
-				if not parser then
-					return nil, format("unknown operation: 0x%.2x", op)
+					self._ts = ts
+				else
+					return nil, format("unsupported op: 0x%.2x", byte(data, 5))
 				end
-
-				self._ts = ts
-
-				local cmd = {}
-				callback(parser(data, size, cmd))
 			elseif size < 4 then
 				return nil, "invalid update log"
 			end
@@ -232,7 +243,8 @@ function _M:replicate(callback, ts)
 		end
 
 		sock:close()
-		ngx.sleep("0.01")
+
+		ngx.sleep("0.1")
 	end
 end
 
