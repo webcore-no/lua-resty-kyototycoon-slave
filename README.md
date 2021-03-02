@@ -55,7 +55,7 @@ http {
 				ngx.log(ngx.ERR, cjson.encode(cmd))
 			end
 
-			local ok, err = ngx.timer.at(0, slave.replicate, slave, slave_cb, ngx.now())
+			local ok, err = ngx.timer.at(0, slave.replicate, slave, slave_cb, ngx.now() * 1000000000)
 
 			if not ok then
 				ngx.log(ngx.ERR, "failed to start create timer: ", err)
