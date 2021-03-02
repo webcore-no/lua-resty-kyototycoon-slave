@@ -32,8 +32,8 @@ end
 local i2b do
 	local result, b, m = {}
 	i2b = function(number, num_bytes)
-		for k=num_bytes, 1, -1 do
-			b, m = k % num_bytes + 1, 2^(8*(k-1))
+		for k = num_bytes - 1, 0, -1 do
+			b, m = num_bytes - k, 2^(8 * k)
 			result[b] = floor(number/m)
 			number = number - result[b]*m
 		end
