@@ -20,7 +20,7 @@ local SET, REMOVE, CLEAR = 0xa1, 0xa2, 0xa5
 
 local function b2i(bytes, num_bytes, offset)
 	offset = offset or 0
-	local number = 0
+	local number = (num_bytes <= 4) and 0 or 0ULL
 
 	for b = 1, num_bytes do
 		number = number + byte(bytes, offset + num_bytes - b + 1)
@@ -35,7 +35,7 @@ local i2b do
 	i2b = function(number, num_bytes)
 		for k = num_bytes - 1, 0, -1 do
 			b, m = num_bytes - k, 2^(8 * k)
-			result[b] = floor(number/m)
+			result[b] = floor(tonumber(number)/m)
 			number = number - result[b]*m
 		end
 
@@ -133,7 +133,7 @@ function _M:replicate(callback, ts)
 		return nil, "callback required"
 	end
 
-	self._ts = ts or 0
+	self._ts = ts or 0ULL
 
 	local replication_request = {
 		BMREPLICATION,
