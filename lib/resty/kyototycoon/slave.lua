@@ -11,7 +11,7 @@ local sub = string.sub
 local band = bit.band
 local lshift = bit.lshift
 
-local worker_exiting = ngx.worker_exiting or function() return false end
+local worker_exiting = ngx.worker.exiting or function() return false end
 
 local BMREPLICATION = char(0xb1)
 local BMNOP = char(0xb0)
@@ -22,8 +22,9 @@ local function b2i(bytes, num_bytes, offset)
 	offset = offset or 0
 	local number = 0
 
-	for b=1, num_bytes do
-		number = number + byte(bytes, offset + num_bytes - b + 1)*2^((b-1)*8)
+	for b = 1, num_bytes do
+		number = number + byte(bytes, offset + num_bytes - b + 1)
+			* 2 ^ ((b - 1) * 8)
 	end
 
 	return number, offset + num_bytes
@@ -125,7 +126,7 @@ function _M:replicate(callback, ts)
 	local sock = rawget(self, "_sock")
 
 	if not sock then
-	   return nil, "socket not initialized"
+		return nil, "socket not initialized"
 	end
 
 	if not callback then
@@ -243,9 +244,9 @@ function _M:replicate(callback, ts)
 		end
 
 		sock:close()
-
-		ngx.sleep("0.1")
+		ngx.sleep("0.01")
 	end
 end
 
 return _M
+
