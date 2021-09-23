@@ -40,7 +40,7 @@ local i2b do
     i2b = function(number, num_bytes)
         for k = num_bytes - 1, 0, -1 do
             b, m = num_bytes - k, 2^(8 * k)
-            result[b] = floor(tonumber(number)/m)
+            result[b] = floor(tonumber(number/m))
             number = number - result[b]*m
         end
 
