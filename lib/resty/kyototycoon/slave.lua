@@ -77,7 +77,7 @@ OP[SET] = function(callback, data, size)
     local ttl = b2i(data, 5, 5 + kpos + vpos + ksize)
     local val = sub(data, 5 + kpos + vpos + 1 + ksize + 1 + 4)
 
-    return callback(key, val, ttl == 2^(5*8) - 1 and nil or ttl)
+    return callback(key, val, ttl ~= 2^(5*8) - 1 and ttl or nil)
 end
 
 OP[REMOVE] = function(callback, data, size)
@@ -119,7 +119,7 @@ function _M:replicate(callback, ts)
     end
 
 
-    self._ts = ts or 0ULL - 2
+    self._ts = ts or ngx.now() * 1000000000ULL
 
     local replication_request = {
         BMREPLICATION,
@@ -149,6 +149,8 @@ function _M:replicate(callback, ts)
         if magic ~= BMREPLICATION then
             return nil, "invalid response"
         end
+
+	ngx.log(ngx.ERR, "replication started")
 
         return true
     end
